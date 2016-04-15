@@ -7,18 +7,22 @@ Part 1
 
 ```{r}
 library('rpart')
-library('DAAG')
 library('dismo')
 library('randomForest')
-library("e1071")
+library('e1071')
+library('adabag')
+library('caret')
+library('ipred')
+library('C50')
 
 sonar.df = read.table("sonar.all-data.txt", header = FALSE, sep = ",", na.strings = "NA" , dec = ".", strip.white = FALSE)
 ```
 
-Here, I used the rpart method instead of a C4.5 classifier due to problems with installation
+Here, I used the C5.0 method instead of a C4.5 classifier due to problems with installation
+to differentiate from boosting I have added a condition that trials are equal to 1
 
 ```{r}
-tree <- rpart(V61~., data= sonar.df, na.action = na.rpart, x = TRUE, y = TRUE)
+tree <- C5.0(as.factor(V61)~., data= sonar.df, trials =1)
 predictions <- predict(tree, sonar.df[, 1:60], type="class")
 summary(tree)
 
@@ -27,7 +31,7 @@ confusionMatrix <- table(predictions, sonar.df$V61)
 
 ```
 
-My function to comute error, accuracy and precision
+My function to compute error, accuracy and precision
 
 ```{r}
 computeErrorMetrics <- function(confusionMatrix) {
@@ -61,7 +65,7 @@ computeErrorMetrics(confusionMatrix)
 
 
 
-Kfold, Rpart
+Kfold, C5.0
 
 
 
@@ -74,40 +78,25 @@ testset <- data.frame()
 for(i in 1:10){
   test <- sonar.df[folds==i,]
   train <- sonar.df[folds!=i,]
-  model <- rpart(V61~., data= train, na.action = na.rpart, x = TRUE, y = TRUE)
+  model <- C5.0(as.factor(V61)~., data= train, trials =1)
   testset<- rbind(testset, as.data.frame(test))
   predictedFold <- data.frame(predict(model, test[, 1:60], type="class"))
   prediction <- rbind(prediction, predictedFold)
 }
 
 cm <- table(as.factor(prediction$predict.model..test...1.60...type....class..), testset$V61)
+sonar.rpart.acc = confusionMatrix(cm)$overall['Accuracy']
 
 computeErrorMetrics(cm)
 ```
 
 
 
+
+
+
 Random Forest using K-fold
 
-```{r}
-prediction.rf <- data.frame()
-testset.rf <- data.frame()
-
-for(i in 1:10){
-  test.rf <- sonar.df[folds==i,]
-  train.rf <- sonar.df[folds!=i,]
-  model.rf <- randomForest(V61~., data= train.rf)
-  testset.rf<- rbind(testset.rf, as.data.frame(test.rf))
-  predictedFold.rf <- data.frame(predict(model.rf, test.rf[, 1:60], type="class"))
-  prediction.rf <- rbind(prediction.rf, predictedFold.rf)
-}
-
-cm.rfk <- table(prediction.rf$predict.model.rf..test.rf...1.60...type....class.., testset.rf$V61)
-
-computeErrorMetrics(cm.rfk)
-
-```
-
 
 
 ```{r}
@@ -124,6 +113,7 @@ for(i in 1:10){
 }
 
 cm.rfk <- table(prediction.rf$predict.model.rf..test.rf...1.60...type....class.., testset.rf$V61)
+sonar.rf.acc = confusionMatrix(cm.rfk)$overall['Accuracy']
 
 computeErrorMetrics(cm.rfk)
 
@@ -144,9 +134,12 @@ for(i in 1:10){
 }
 
 cm.svmk <- table(prediction.svm$predict.model.svm..test.svm...1.60...type....class.., testset.svm$V61)
+sonar.svm.acc = confusionMatrix(cm.svmk)$overall['Accuracy']
 
 computeErrorMetrics(cm.svmk)
 ```
+
+
 naiveBayes
 
 ```{r}
@@ -163,9 +156,60 @@ for(i in 1:10){
 }
 
 cm.nbk <- table(prediction.nb$predict.model.nb..test.nb...1.60...type....class.., testset.nb$V61)
+sonar.nb.acc = confusionMatrix(cm.nbk)$overall['Accuracy']
 
 computeErrorMetrics(cm.nbk)
 ```
+
+
+
+
+The difference between the above methods and bagging and boosting
+
+Bagging
+
+```{r}
+folds <- kfold(sonar.df, k=10 )
+prediction <- data.frame()
+testset <- data.frame()
+
+for(i in 1:10){
+  test <- sonar.df[folds==i,]
+  train <- sonar.df[folds!=i,]
+  model <- bagging(V61~., data= train)
+  testset<- rbind(testset, as.data.frame(test))
+  predictedFold <- data.frame(predict(model, test[, 1:60]))
+  prediction <- rbind(prediction, predictedFold)
+}
+
+confusionMatrix(prediction$predict.model..test...1.60.., testset$V61)
+```
+
+
+Boosting values
+
+```{r}
+prediction <- data.frame()
+testset <- data.frame()
+
+for(i in 1:10){
+  test <- sonar.df[folds==i,]
+  train <- sonar.df[folds!=i,]
+  model <- C5.0(V61~., data= train, trials=10)
+  
+  testset<- rbind(testset, as.data.frame(test) )
+  predictedFold <- data.frame(predict(model, test[, 1:60]))
+  prediction <- rbind(prediction, predictedFold)
+}
+
+confusionMatrix(prediction$predict.model..test...1.60.., testset$V61)
+
+```
+
+
+Bagging and Bossting did not have a high effect in increasing accuracy for the C5.0 classifier
+
+PART 4:
 
 for hepatitis, reading files
 
@@ -173,7 +217,8 @@ for hepatitis, reading files
 hepatitis.df <- read.table("hepatitis.data.txt", header = FALSE, sep = ",", na.strings = "?" , dec = ".", strip.white = FALSE)
 ```
 
-Perform rpart on Hepatitis
+Perform C5.0 on Hepatitis
+
 
 ```{r}
 folds <- kfold(hepatitis.df, k=10 )
@@ -184,13 +229,14 @@ testset <- data.frame()
 for(i in 1:10){
   test <- hepatitis.df[folds==i,]
   train <- hepatitis.df[folds!=i,]
-  model <- rpart(V20~., data= train, na.action = na.rpart, x = TRUE, y = TRUE)
+  model <- C5.0(as.factor(V20)~., data= train,trials =1)
   testset<- rbind(testset, as.data.frame(test))
   predictedFold <- data.frame(predict(model, test[, 1:19]))
   prediction <- rbind(prediction, predictedFold)
 }
-
-cm <- table(as.factor(prediction$predict.model..test...1.19..), testset$V20)
+prediction
+cm <- table(as.integer(prediction$predict.model..test...1.19..), testset$V20)
+hepatitis.rpart.acc =confusionMatrix(cm)$overall['Accuracy']
 
 computeErrorMetrics(cm)
 
@@ -210,6 +256,8 @@ for(i in 1:10){
   prediction.rf <- rbind(prediction.rf, predictedFold.rf)
 }
 cm.rfk <- table(prediction.rf$predict.model.rf..test.rf...1.19.., testset.rf$V20)
+hepatitis.rf.acc = confusionMatrix(cm.rfk)$overall['Accuracy']
+
 computeErrorMetrics(cm.rfk)
 
 ```
@@ -234,6 +282,7 @@ for(i in 1:10){
 }
 
 cm.nbk <- table(as.factor(prediction.nb$predict.model.nb..test.nb...1.19..), testset.nb$V20)
+hepatitis.nb.acc = confusionMatrix(cm.nbk)$overall['Accuracy']
 
 computeErrorMetrics(cm.nbk)
 
@@ -257,6 +306,7 @@ for(i in 1:10){
 }
 
 cm.svmk <- table(prediction.sv$predict.model.sv..test.sv...1.19.., testset.sv$V20)
+hepatitis.svm.acc = confusionMatrix(cm.svmk)$overall['Accuracy']
 
 computeErrorMetrics(cm.svmk)
 
@@ -271,24 +321,26 @@ pima.df = read.table("pima-indians-diabetes.data.txt", header = FALSE, sep = ","
 
 ```
 
-Pima Rpart
+Pima C5.0
 
 ```{r}
 folds <- kfold(pima.df, k=10 )
-
 prediction <- data.frame()
 testset <- data.frame()
 
 for(i in 1:10){
   test <- pima.df[folds==i,]
   train <- pima.df[folds!=i,]
-  model <- rpart(V9~., data= train, na.action = na.rpart, x = TRUE, y = TRUE)
+  model <- C5.0(as.factor(V9)~., data= train,trials =1 )
+  
   testset<- rbind(testset, as.data.frame(test))
   predictedFold <- data.frame(predict(model, test[, 1:8]))
   prediction <- rbind(prediction, predictedFold)
 }
 
 cm <- table(as.factor(prediction$predict.model..test...1.8..), testset$V9)
+
+pima.rpart.acc = confusionMatrix(cm)$overall['Accuracy']
 
 computeErrorMetrics(cm)
 
@@ -310,6 +362,7 @@ for(i in 1:10){
   prediction.rf <- rbind(prediction.rf, predictedFold.rf)
 }
 cm.rfk <- table(prediction.rf$predict.model.rf..test.rf...1.8.., testset.rf$V9)
+pima.rf.acc = confusionMatrix(cm.rfk)$overall['Accuracy']
 
 computeErrorMetrics(cm.rfk)
 
@@ -325,13 +378,14 @@ testset.svm <- data.frame()
 for(i in 1:10){
   test.svm <- pima.df[folds==i,]
   train.svm <- pima.df[folds!=i,]
-  model.svm <- svm(V9~., data= train.svm)
+  model.svm <- svm(as.factor(V9)~., data= train.svm)
   testset.svm<- rbind(testset.svm, as.data.frame(test.svm))
   predictedFold.svm <- data.frame(predict(model.svm, test.svm[, 1:8]))
   prediction.svm <- rbind(prediction.svm, predictedFold.svm)
 }
 
 cm.svmk <- table(prediction.svm$predict.model.svm..test.svm...1.8.., testset.svm$V9)
+pima.svm.acc = confusionMatrix(cm.svmk)$overall['Accuracy']
 
 computeErrorMetrics(cm.svmk)
 
@@ -354,6 +408,7 @@ for(i in 1:10){
 }
 
 cm.nbk <- table(prediction.nb$predict.model.nb..test.nb...1.8.., testset.nb$V9)
+pima.nb.acc = confusionMatrix(cm.nbk)$overall['Accuracy']
 
 computeErrorMetrics(cm.nbk)
 
@@ -368,7 +423,7 @@ spect.df = rbind(spect.train.df, spect.test.df)
 ```
 
 
-Spect Rpart
+Spect C5.0
 
 ```{r}
 folds <- kfold(spect.df, k=10 )
@@ -379,14 +434,14 @@ testset <- data.frame()
 for(i in 1:10){
   test <- spect.df[folds==i,]
   train <- spect.df[folds!=i,]
-  model <- rpart(V23~., data= train, na.action = na.rpart, x = TRUE, y = TRUE)
+  model <- C5.0(as.factor(V23)~., data= train, trials =1)
   testset<- rbind(testset, as.data.frame(test))
   predictedFold <- data.frame(predict(model, test[, 1:22]))
   prediction <- rbind(prediction, predictedFold)
 }
 
 cm <- table(as.factor(prediction$predict.model..test...1.22..), testset$V23)
-
+spect.rpart.acc = confusionMatrix(cm)$overall['Accuracy']
 computeErrorMetrics(cm)
 
 ```
@@ -407,7 +462,7 @@ for(i in 1:10){
   prediction.rf <- rbind(prediction.rf, predictedFold.rf)
 }
 cm.rfk <- table(prediction.rf$predict.model.rf..test.rf...1.22.., testset.rf$V23)
-
+spect.rf.acc = confusionMatrix(cm.rfk)$overall['Accuracy']
 computeErrorMetrics(cm.rfk)
 
 ```
@@ -422,14 +477,14 @@ testset.svm <- data.frame()
 for(i in 1:10){
   test.svm <- spect.df[folds==i,]
   train.svm <- spect.df[folds!=i,]
-  model.svm <- svm(V23~., data= train.svm)
+  model.svm <- svm(as.factor(V23)~., data= train.svm)
   testset.svm<- rbind(testset.svm, as.data.frame(test.svm))
   predictedFold.svm <- data.frame(predict(model.svm, test.svm[, 1:22]))
   prediction.svm <- rbind(prediction.svm, predictedFold.svm)
 }
 
 cm.svmk <- table(prediction.svm$predict.model.svm..test.svm...1.22.., testset.svm$V23)
-
+spect.svm.acc = confusionMatrix(cm.svmk)$overall['Accuracy']
 computeErrorMetrics(cm.svmk)
 
 ```
@@ -451,6 +506,21 @@ for(i in 1:10){
 }
 
 cm.nbk <- table(prediction.nb$predict.model.nb..test.nb...1.22.., testset.nb$V23)
-
+spect.nb.acc = confusionMatrix(cm.nbk)$overall['Accuracy']
 computeErrorMetrics(cm.nbk)
+```
+
+
+
+A matrix to compare accuracy
+
+There is no algorithm that has could achieve the highest accuracty of them all
+Proving that not all algorithms have a perfect output
+
+```{r}
+A = matrix(  c(sonar.rpart.acc,hepatitis.rpart.acc, spect.rpart.acc, pima.rpart.acc,
+    sonar.rf.acc, hepatitis.rf.acc, spect.rf.acc, pima.rf.acc,
+    sonar.svm.acc, hepatitis.svm.acc, spect.svm.acc, pima.svm.acc, sonar.nb.acc, hepatitis.nb.acc, spect.nb.acc, pima.rpart.acc),nrow=4,   ncol=4, byrow = TRUE) 
+dimnames(A) = list( c("C5.0", "RandomForest", "SVM", "NaiveBayes"),  c("Sonar", "Hepatitis", "Pima", "Spect"))
+A
 ```
