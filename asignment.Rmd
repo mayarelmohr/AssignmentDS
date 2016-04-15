@@ -1,0 +1,456 @@
+---
+title: "Assignment"
+output: html_document
+---
+
+Part 1 
+
+```{r}
+library('rpart')
+library('DAAG')
+library('dismo')
+library('randomForest')
+library("e1071")
+
+sonar.df = read.table("sonar.all-data.txt", header = FALSE, sep = ",", na.strings = "NA" , dec = ".", strip.white = FALSE)
+```
+
+Here, I used the rpart method instead of a C4.5 classifier due to problems with installation
+
+```{r}
+tree <- rpart(V61~., data= sonar.df, na.action = na.rpart, x = TRUE, y = TRUE)
+predictions <- predict(tree, sonar.df[, 1:60], type="class")
+summary(tree)
+
+table(predictions, sonar.df$V61)
+confusionMatrix <- table(predictions, sonar.df$V61)
+
+```
+
+My function to comute error, accuracy and precision
+
+```{r}
+computeErrorMetrics <- function(confusionMatrix) {
+p = confusionMatrix[1,1]/ (confusionMatrix[1,1] + confusionMatrix[2,1])
+
+cat("precision is", p)
+r = confusionMatrix[1,1]/ (confusionMatrix[1,1] + confusionMatrix[1,2])
+
+cat("Recall is", r)
+
+a = (confusionMatrix[1,1] + confusionMatrix[2,2]  )/ (confusionMatrix[1,1] + confusionMatrix[1,2] + confusionMatrix[2,1] + confusionMatrix[2,2] )
+
+cat("Accuracy is", a)
+
+error = 1 - a
+
+cat("Error is", a)
+fscore = (2*p*r)/ (p + r)
+cat("fscore is", fscore)
+
+}
+```
+Obviously, the accuracy is high due to overfitting
+
+
+```{r}
+
+computeErrorMetrics(confusionMatrix)
+
+```
+
+
+
+Kfold, Rpart
+
+
+
+```{r}
+folds <- kfold(sonar.df, k=10 )
+
+prediction <- data.frame()
+testset <- data.frame()
+
+for(i in 1:10){
+  test <- sonar.df[folds==i,]
+  train <- sonar.df[folds!=i,]
+  model <- rpart(V61~., data= train, na.action = na.rpart, x = TRUE, y = TRUE)
+  testset<- rbind(testset, as.data.frame(test))
+  predictedFold <- data.frame(predict(model, test[, 1:60], type="class"))
+  prediction <- rbind(prediction, predictedFold)
+}
+
+cm <- table(as.factor(prediction$predict.model..test...1.60...type....class..), testset$V61)
+
+computeErrorMetrics(cm)
+```
+
+
+
+Random Forest using K-fold
+
+```{r}
+prediction.rf <- data.frame()
+testset.rf <- data.frame()
+
+for(i in 1:10){
+  test.rf <- sonar.df[folds==i,]
+  train.rf <- sonar.df[folds!=i,]
+  model.rf <- randomForest(V61~., data= train.rf)
+  testset.rf<- rbind(testset.rf, as.data.frame(test.rf))
+  predictedFold.rf <- data.frame(predict(model.rf, test.rf[, 1:60], type="class"))
+  prediction.rf <- rbind(prediction.rf, predictedFold.rf)
+}
+
+cm.rfk <- table(prediction.rf$predict.model.rf..test.rf...1.60...type....class.., testset.rf$V61)
+
+computeErrorMetrics(cm.rfk)
+
+```
+
+
+
+```{r}
+prediction.rf <- data.frame()
+testset.rf <- data.frame()
+
+for(i in 1:10){
+  test.rf <- sonar.df[folds==i,]
+  train.rf <- sonar.df[folds!=i,]
+  model.rf <- randomForest(V61~., data= train.rf)
+  testset.rf<- rbind(testset.rf, as.data.frame(test.rf))
+  predictedFold.rf <- data.frame(predict(model.rf, test.rf[, 1:60], type="class"))
+  prediction.rf <- rbind(prediction.rf, predictedFold.rf)
+}
+
+cm.rfk <- table(prediction.rf$predict.model.rf..test.rf...1.60...type....class.., testset.rf$V61)
+
+computeErrorMetrics(cm.rfk)
+
+```
+
+SVM
+```{r}
+prediction.svm <- data.frame()
+testset.svm <- data.frame()
+
+for(i in 1:10){
+  test.svm <- sonar.df[folds==i,]
+  train.svm <- sonar.df[folds!=i,]
+  model.svm <- svm(V61~., data= train.svm)
+  testset.svm<- rbind(testset.svm, as.data.frame(test.svm))
+  predictedFold.svm <- data.frame(predict(model.svm, test.svm[, 1:60], type="class"))
+  prediction.svm <- rbind(prediction.svm, predictedFold.svm)
+}
+
+cm.svmk <- table(prediction.svm$predict.model.svm..test.svm...1.60...type....class.., testset.svm$V61)
+
+computeErrorMetrics(cm.svmk)
+```
+naiveBayes
+
+```{r}
+prediction.nb <- data.frame()
+testset.nb <- data.frame()
+
+for(i in 1:10){
+  test.nb <- sonar.df[folds==i,]
+  train.nb <- sonar.df[folds!=i,]
+  model.nb <- naiveBayes(V61~., data= train.nb)
+  testset.nb<- rbind(testset.nb, as.data.frame(test.nb))
+  predictedFold.nb <- data.frame(predict(model.nb, test.nb[, 1:60], type="class"))
+  prediction.nb <- rbind(prediction.nb, predictedFold.nb)
+}
+
+cm.nbk <- table(prediction.nb$predict.model.nb..test.nb...1.60...type....class.., testset.nb$V61)
+
+computeErrorMetrics(cm.nbk)
+```
+
+for hepatitis, reading files
+
+```{r}
+hepatitis.df <- read.table("hepatitis.data.txt", header = FALSE, sep = ",", na.strings = "?" , dec = ".", strip.white = FALSE)
+```
+
+Perform rpart on Hepatitis
+
+```{r}
+folds <- kfold(hepatitis.df, k=10 )
+
+prediction <- data.frame()
+testset <- data.frame()
+
+for(i in 1:10){
+  test <- hepatitis.df[folds==i,]
+  train <- hepatitis.df[folds!=i,]
+  model <- rpart(V20~., data= train, na.action = na.rpart, x = TRUE, y = TRUE)
+  testset<- rbind(testset, as.data.frame(test))
+  predictedFold <- data.frame(predict(model, test[, 1:19]))
+  prediction <- rbind(prediction, predictedFold)
+}
+
+cm <- table(as.factor(prediction$predict.model..test...1.19..), testset$V20)
+
+computeErrorMetrics(cm)
+
+```
+
+Random Forest Hepatitis
+Random Forest has a problem with missing values, so it has to be handled, before applying the method
+```{r}
+prediction.rf <- data.frame()
+testset.rf <- data.frame()
+for(i in 1:10){
+  test.rf <- hepatitis.df[folds==i,]
+  train.rf <- hepatitis.df[folds!=i,]
+  model.rf <- randomForest(as.factor(V20)~., data= train.rf, na.action = na.omit )
+  testset.rf<- rbind(testset.rf, as.data.frame(test.rf))
+  predictedFold.rf <- data.frame(predict(model.rf, test.rf[, 1:19]))
+  prediction.rf <- rbind(prediction.rf, predictedFold.rf)
+}
+cm.rfk <- table(prediction.rf$predict.model.rf..test.rf...1.19.., testset.rf$V20)
+computeErrorMetrics(cm.rfk)
+
+```
+
+
+
+
+Naive bayes Hepatitis
+
+
+```{r}
+prediction.nb <- data.frame()
+testset.nb <- data.frame()
+
+for(i in 1:10){
+  test.nb <- hepatitis.df[folds==i,]
+  train.nb <- hepatitis.df[folds!=i,]
+  model.nb <- naiveBayes(as.factor(V20)~., data= train.nb)
+  testset.nb<- rbind(testset.nb, as.data.frame(test.nb))
+  predictedFold.nb <- data.frame(predict(model.nb, test.nb[, 1:19]))
+  prediction.nb <- rbind(prediction.nb, predictedFold.nb)
+}
+
+cm.nbk <- table(as.factor(prediction.nb$predict.model.nb..test.nb...1.19..), testset.nb$V20)
+
+computeErrorMetrics(cm.nbk)
+
+```
+
+
+SVM hepatitis
+
+```{r}
+hepatitis.df <- read.table("hepatitis.data.txt", header = FALSE, sep = ",", na.strings = "NA" , dec = ".", strip.white = FALSE)
+testset.sv <- data.frame()
+
+prediction.sv <- data.frame()
+for(i in 1:10){
+  test.sv <- hepatitis.df[folds==i,]
+  train.sv <- hepatitis.df[folds!=i,]
+  model.sv <- svm(as.factor(V20)~., data= train.sv)
+  testset.sv<- rbind(testset.sv, as.data.frame(test.sv))
+  predictedFold.sv <- data.frame(predict(model.sv, test.sv[, 1:19]))
+  prediction.sv <- rbind(prediction.sv, predictedFold.sv)
+}
+
+cm.svmk <- table(prediction.sv$predict.model.sv..test.sv...1.19.., testset.sv$V20)
+
+computeErrorMetrics(cm.svmk)
+
+
+
+```
+
+
+Pima data
+```{r}
+pima.df = read.table("pima-indians-diabetes.data.txt", header = FALSE, sep = ",", na.strings = "NA" , dec = ".", strip.white = FALSE)
+
+```
+
+Pima Rpart
+
+```{r}
+folds <- kfold(pima.df, k=10 )
+
+prediction <- data.frame()
+testset <- data.frame()
+
+for(i in 1:10){
+  test <- pima.df[folds==i,]
+  train <- pima.df[folds!=i,]
+  model <- rpart(V9~., data= train, na.action = na.rpart, x = TRUE, y = TRUE)
+  testset<- rbind(testset, as.data.frame(test))
+  predictedFold <- data.frame(predict(model, test[, 1:8]))
+  prediction <- rbind(prediction, predictedFold)
+}
+
+cm <- table(as.factor(prediction$predict.model..test...1.8..), testset$V9)
+
+computeErrorMetrics(cm)
+
+```
+
+Pima random forest
+
+```{r}
+
+prediction.rf <- data.frame()
+testset.rf <- data.frame()
+
+for(i in 1:10){
+  test.rf <- pima.df[folds==i,]
+  train.rf <- pima.df[folds!=i,]
+  model.rf <- randomForest(as.factor(V9)~., data= train.rf)
+  testset.rf<- rbind(testset.rf, as.data.frame(test.rf))
+  predictedFold.rf <- data.frame(predict(model.rf, test.rf[, 1:8]))
+  prediction.rf <- rbind(prediction.rf, predictedFold.rf)
+}
+cm.rfk <- table(prediction.rf$predict.model.rf..test.rf...1.8.., testset.rf$V9)
+
+computeErrorMetrics(cm.rfk)
+
+```
+
+Pima SVM
+
+```{r}
+
+prediction.svm <- data.frame()
+testset.svm <- data.frame()
+
+for(i in 1:10){
+  test.svm <- pima.df[folds==i,]
+  train.svm <- pima.df[folds!=i,]
+  model.svm <- svm(V9~., data= train.svm)
+  testset.svm<- rbind(testset.svm, as.data.frame(test.svm))
+  predictedFold.svm <- data.frame(predict(model.svm, test.svm[, 1:8]))
+  prediction.svm <- rbind(prediction.svm, predictedFold.svm)
+}
+
+cm.svmk <- table(prediction.svm$predict.model.svm..test.svm...1.8.., testset.svm$V9)
+
+computeErrorMetrics(cm.svmk)
+
+```
+
+Naive bayes pima
+
+
+```{r}
+prediction.nb <- data.frame()
+testset.nb <- data.frame()
+
+for(i in 1:10){
+  test.nb <- pima.df[folds==i,]
+  train.nb <- pima.df[folds!=i,]
+  model.nb <- naiveBayes(as.factor(V9)~., data= train.nb)
+  testset.nb<- rbind(testset.nb, as.data.frame(test.nb))
+  predictedFold.nb <- data.frame(predict(model.nb, test.nb[, 1:8]))
+  prediction.nb <- rbind(prediction.nb, predictedFold.nb)
+}
+
+cm.nbk <- table(prediction.nb$predict.model.nb..test.nb...1.8.., testset.nb$V9)
+
+computeErrorMetrics(cm.nbk)
+
+```
+
+Spect data
+```{r}
+spect.train.df = read.table("SPECT.train.txt", header = FALSE, sep = ",", na.strings = "NA" , dec = ".", strip.white = FALSE)
+spect.test.df = read.table("SPECT.test.txt", header = FALSE, sep = ",", na.strings = "NA" , dec = ".", strip.white = FALSE)
+
+spect.df = rbind(spect.train.df, spect.test.df)
+```
+
+
+Spect Rpart
+
+```{r}
+folds <- kfold(spect.df, k=10 )
+
+prediction <- data.frame()
+testset <- data.frame()
+
+for(i in 1:10){
+  test <- spect.df[folds==i,]
+  train <- spect.df[folds!=i,]
+  model <- rpart(V23~., data= train, na.action = na.rpart, x = TRUE, y = TRUE)
+  testset<- rbind(testset, as.data.frame(test))
+  predictedFold <- data.frame(predict(model, test[, 1:22]))
+  prediction <- rbind(prediction, predictedFold)
+}
+
+cm <- table(as.factor(prediction$predict.model..test...1.22..), testset$V23)
+
+computeErrorMetrics(cm)
+
+```
+
+spect random forest
+
+```{r}
+
+prediction.rf <- data.frame()
+testset.rf <- data.frame()
+
+for(i in 1:10){
+  test.rf <- spect.df[folds==i,]
+  train.rf <- spect.df[folds!=i,]
+  model.rf <- randomForest(as.factor(V23)~., data= train.rf)
+  testset.rf<- rbind(testset.rf, as.data.frame(test.rf))
+  predictedFold.rf <- data.frame(predict(model.rf, test.rf[, 1:22]))
+  prediction.rf <- rbind(prediction.rf, predictedFold.rf)
+}
+cm.rfk <- table(prediction.rf$predict.model.rf..test.rf...1.22.., testset.rf$V23)
+
+computeErrorMetrics(cm.rfk)
+
+```
+
+spect SVM
+
+```{r}
+
+prediction.svm <- data.frame()
+testset.svm <- data.frame()
+
+for(i in 1:10){
+  test.svm <- spect.df[folds==i,]
+  train.svm <- spect.df[folds!=i,]
+  model.svm <- svm(V23~., data= train.svm)
+  testset.svm<- rbind(testset.svm, as.data.frame(test.svm))
+  predictedFold.svm <- data.frame(predict(model.svm, test.svm[, 1:22]))
+  prediction.svm <- rbind(prediction.svm, predictedFold.svm)
+}
+
+cm.svmk <- table(prediction.svm$predict.model.svm..test.svm...1.22.., testset.svm$V23)
+
+computeErrorMetrics(cm.svmk)
+
+```
+
+Naive bayes spect
+
+
+```{r}
+prediction.nb <- data.frame()
+testset.nb <- data.frame()
+
+for(i in 1:10){
+  test.nb <- spect.df[folds==i,]
+  train.nb <- spect.df[folds!=i,]
+  model.nb <- naiveBayes(as.factor(V23)~., data= train.nb)
+  testset.nb<- rbind(testset.nb, as.data.frame(test.nb))
+  predictedFold.nb <- data.frame(predict(model.nb, test.nb[, 1:22]))
+  prediction.nb <- rbind(prediction.nb, predictedFold.nb)
+}
+
+cm.nbk <- table(prediction.nb$predict.model.nb..test.nb...1.22.., testset.nb$V23)
+
+computeErrorMetrics(cm.nbk)
+```
